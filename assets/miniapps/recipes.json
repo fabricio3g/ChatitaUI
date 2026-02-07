@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "updatedAt": "2026-02-07",
+  "recipes": [
+    {
+      "id": "oatmeal",
+      "name": "Creamy Oatmeal",
+      "cuisine": "American",
+      "time_minutes": 10,
+      "difficulty": "beginner",
+      "diet": ["vegetarian"],
+      "ingredients": ["rolled oats", "milk or water", "pinch of salt", "honey"],
+      "steps": ["Simmer oats in liquid with salt", "Stir until creamy", "Top with honey and fruit"],
+      "notes": "Add cinnamon or nut butter for extra flavor."
+    },
+    {
+      "id": "stir_fry",
+      "name": "Veggie Stir-Fry",
+      "cuisine": "Asian",
+      "time_minutes": 20,
+      "difficulty": "beginner",
+      "diet": ["vegan"],
+      "ingredients": ["mixed vegetables", "soy sauce", "garlic", "ginger", "rice"],
+      "steps": ["Saute aromatics", "Add veggies and stir fry", "Season with soy sauce", "Serve over rice"],
+      "notes": "Use high heat for better texture."
+    },
+    {
+      "id": "chicken_salad",
+      "name": "Herb Chicken Salad",
+      "cuisine": "Mediterranean",
+      "time_minutes": 25,
+      "difficulty": "intermediate",
+      "diet": ["gluten-free"],
+      "ingredients": ["chicken breast", "olive oil", "lemon", "mixed greens", "herbs"],
+      "steps": ["Season and cook chicken", "Slice and toss with greens", "Dress with lemon and olive oil"],
+      "notes": "Swap with chickpeas for a vegetarian version."
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "updatedAt": "2026-02-07",
+  "exercises": [
+    {
+      "id": "push_up",
+      "name": "Push-Up",
+      "muscle_groups": ["chest", "triceps", "shoulders"],
+      "equipment": ["bodyweight"],
+      "difficulty": "beginner",
+      "instructions": "Keep a straight line from head to heels. Lower under control and press back up.",
+      "tempo": "2-1-2",
+      "contraindications": ["wrist pain", "shoulder pain"]
+    },
+    {
+      "id": "squat",
+      "name": "Air Squat",
+      "muscle_groups": ["quads", "glutes", "core"],
+      "equipment": ["bodyweight"],
+      "difficulty": "beginner",
+      "instructions": "Sit back and down, keep chest up, drive through heels.",
+      "tempo": "3-1-2",
+      "contraindications": ["knee pain"]
+    },
+    {
+      "id": "plank",
+      "name": "Plank",
+      "muscle_groups": ["core", "shoulders"],
+      "equipment": ["bodyweight"],
+      "difficulty": "beginner",
+      "instructions": "Elbows under shoulders. Brace core and hold a straight line.",
+      "tempo": "hold",
+      "contraindications": ["low back pain"]
+    },
+    {
+      "id": "dumbbell_row",
+      "name": "Dumbbell Row",
+      "muscle_groups": ["back", "biceps"],
+      "equipment": ["dumbbell"],
+      "difficulty": "intermediate",
+      "instructions": "Hinge at hips, pull the dumbbell to your ribs, control the lower.",
+      "tempo": "2-1-2",
+      "contraindications": ["low back pain"]
+    },
+    {
+      "id": "split_squat",
+      "name": "Split Squat",
+      "muscle_groups": ["quads", "glutes"],
+      "equipment": ["bodyweight"],
+      "difficulty": "intermediate",
+      "instructions": "Stay tall, drop the back knee down, keep front heel planted.",
+      "tempo": "3-1-2",
+      "contraindications": ["knee pain"]
+    }
+  ]
+}

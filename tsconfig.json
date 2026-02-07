@@ -1,0 +1,15 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true
+  },
+  "exclude": [
+    "src/services/executorch",
+    "src/services/llm/ExecutorchLLMProvider.ts",
+    "src/services/llm/ExecutorchVisionProvider.ts",
+    "src/services/stt/ExecutorchSTTProvider.ts",
+    "src/services/tts/ExecutorchTTSProvider.ts",
+    "src/services/tts/KokoroProvider.ts",
+    "src/services/tts/kokoro"
+  ]
+}

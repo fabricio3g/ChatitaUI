@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "updatedAt": "2026-02-07",
+  "roles": [
+    {
+      "role": "Frontend Engineer",
+      "levels": ["junior", "mid", "senior"],
+      "questions": [
+        {
+          "id": "fe_1",
+          "level": "junior",
+          "question": "Explain the difference between margin and padding.",
+          "expected_points": ["margin outside element", "padding inside element"],
+          "rubric": "Candidate clearly defines both and gives a practical example."
+        },
+        {
+          "id": "fe_2",
+          "level": "mid",
+          "question": "How does the browser render a page from HTML to pixels?",
+          "expected_points": ["parse HTML", "build DOM/CSSOM", "layout", "paint", "compositing"],
+          "rubric": "Mentions critical stages and performance implications."
+        },
+        {
+          "id": "fe_3",
+          "level": "senior",
+          "question": "Describe how you would reduce bundle size and improve performance in a large React app.",
+          "expected_points": ["code splitting", "tree shaking", "measurements", "caching"],
+          "rubric": "Proposes a plan and validation strategy."
+        }
+      ]
+    },
+    {
+      "role": "Product Manager",
+      "levels": ["junior", "mid", "senior"],
+      "questions": [
+        {
+          "id": "pm_1",
+          "level": "junior",
+          "question": "How do you define success for a feature launch?",
+          "expected_points": ["metrics", "baseline", "timeframe"],
+          "rubric": "Defines measurable KPIs and rollout plan."
+        },
+        {
+          "id": "pm_2",
+          "level": "mid",
+          "question": "How do you prioritize a backlog with conflicting stakeholder requests?",
+          "expected_points": ["impact", "effort", "user value"],
+          "rubric": "Uses a framework and aligns to goals."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css";
+
+@import "nativewind/theme";
+
+/*
+  Design tokens (CSS variables) used by Tailwind classes like:
+  - bg-bg / text-fg / border-border / bg-card
+  - text-muted / bg-primary / text-primary, etc.
+
+  On native, these variables are set in CSS and can also be overridden at runtime
+  via nativewind's `vars()` if we want dynamic ThemeContext → tokens later.
+*/
+:root {
+  --bg: 248 250 252;
+  --fg: 17 17 17;
+  --card: 255 255 255;
+  --panel: 241 245 249;
+  --border: 226 232 240;
+  --muted: 100 116 139;
+
+  --primary: 59 130 246;
+  --success: 16 185 129;
+  --warning: 245 158 11;
+  --error: 239 68 68;
+}
+
+.dark {
+  --bg: 10 10 10;
+  --fg: 245 245 245;
+  --card: 18 18 18;
+  --panel: 24 24 27;
+  --border: 39 39 42;
+  --muted: 161 161 170;
+
+  --primary: 96 165 250;
+  --success: 52 211 153;
+  --warning: 251 191 36;
+  --error: 248 113 113;
+}
