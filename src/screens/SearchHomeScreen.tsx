@@ -18,6 +18,7 @@ import {
     Keyboard,
     FlatList,
     Dimensions,
+    KeyboardAvoidingView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -92,6 +93,7 @@ export const SearchHomeScreen: React.FC = () => {
     const flatListRef = useRef<FlatList>(null);
     const hasScrolledForStream = useRef<boolean>(false);
     const abortControllerRef = useRef<AbortController | null>(null);
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
 
     // Report generation state
     const [reportModalVisible, setReportModalVisible] = useState(false);
@@ -117,6 +119,23 @@ export const SearchHomeScreen: React.FC = () => {
             animateEntry();
         }
     }, [route.params?.conversationId]);
+
+    useEffect(() => {
+        const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+            if (Platform.OS === 'android') {
+                setKeyboardHeight(e.endCoordinates?.height || 0);
+            }
+        });
+        const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+            if (Platform.OS === 'android') {
+                setKeyboardHeight(0);
+            }
+        });
+        return () => {
+            showSub.remove();
+            hideSub.remove();
+        };
+    }, []);
 
     const animateEntry = () => {
         logoAnim.setValue(0);
@@ -434,7 +453,10 @@ export const SearchHomeScreen: React.FC = () => {
                     />
                 }
             >
-                <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+                <KeyboardAvoidingView
+                    style={[styles.container, { backgroundColor: theme.colors.background }]}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                >
                     <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} />
 
                     {/* Minimal Header */}
@@ -446,11 +468,11 @@ export const SearchHomeScreen: React.FC = () => {
                         <View style={{ width: 36 }} />
                     </View>
 
-                <ScrollView
-                    contentContainerStyle={[styles.centerContainer, { paddingTop: 40 }]}
-                    keyboardShouldPersistTaps="handled"
-                    showsVerticalScrollIndicator={false}
-                >
+                    <ScrollView
+                        contentContainerStyle={[styles.centerContainer, { paddingTop: 40 }]}
+                        keyboardShouldPersistTaps="handled"
+                        showsVerticalScrollIndicator={false}
+                    >
                     {/* Animated Logo */}
                     <Animated.View style={{
                         opacity: logoAnim,
@@ -571,8 +593,8 @@ export const SearchHomeScreen: React.FC = () => {
                             ))}
                         </View>
                     </Animated.View>
-                </ScrollView>
-            </View>
+                    </ScrollView>
+                </KeyboardAvoidingView>
             </Drawer>
         );
     }
@@ -591,7 +613,10 @@ export const SearchHomeScreen: React.FC = () => {
                 />
             }
         >
-            <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <KeyboardAvoidingView
+                style={[styles.container, { backgroundColor: theme.colors.background }]}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            >
                 <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} />
 
                 {/* Header */}
@@ -638,7 +663,7 @@ export const SearchHomeScreen: React.FC = () => {
 
             {/* Bottom Input */}
             <View style={[styles.bottomBar, {
-                paddingBottom: insets.bottom + 12,
+                paddingBottom: insets.bottom + 12 + (Platform.OS === 'android' ? keyboardHeight : 0),
                 backgroundColor: 'transparent',
                 borderTopColor: theme.colors.borderLight,
             }]}>
@@ -682,7 +707,7 @@ export const SearchHomeScreen: React.FC = () => {
                     )}
                 </View>
             </View>
-            </View>
+            </KeyboardAvoidingView>
 
             {/* Report Viewer Modal */}
             <ReportViewerModal

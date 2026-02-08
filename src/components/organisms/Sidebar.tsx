@@ -299,7 +299,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, navigation }
                                 theme={theme}
                             />
                         )}
-                        contentContainerStyle={{ padding: 16, paddingTop: 8 }}
+                        contentContainerStyle={{ padding: 16, paddingTop: 8, paddingBottom: insets.bottom + 120 }}
                         showsVerticalScrollIndicator={false}
                     />
                 )}

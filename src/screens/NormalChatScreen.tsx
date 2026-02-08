@@ -252,7 +252,7 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
             if (change.simulatedToolsEnabled !== undefined) {
                 setSimulatedToolsEnabled(change.simulatedToolsEnabled);
             }
-            if (change.provider === 'llama_rn' || change.provider === undefined) {
+            if (change.provider !== undefined || change.model !== undefined) {
                 refreshProviderAndModel();
             }
         });
@@ -277,6 +277,8 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
                 setCurrentModel(model?.name || model?.id || 'Local GGUF');
             } else if (cfg?.model) {
                 setCurrentModel(cfg.model);
+            } else {
+                setIsLocalGguf(false);
             }
 
             // Fallback to persisted settings (in case service not initialized yet)
