@@ -7,6 +7,7 @@ type SettingsChange = {
     userPersona?: string;
     showReasoning?: boolean;
     streamingChunksEnabled?: boolean;
+    simulatedToolsEnabled?: boolean;
 };
 
 type Listener = (change: SettingsChange) => void;

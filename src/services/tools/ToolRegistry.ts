@@ -2,7 +2,6 @@ import { Tool } from './types';
 import { WebSearchTool } from './WebSearchTool';
 import { DeepSearchTool } from './DeepSearchTool';
 import { CustomTool, CustomToolConfig } from './CustomTool';
-import { MediaTool } from './MediaTool';
 import { WeatherTool } from './WeatherTool';
 import { CalculatorTool } from './CalculatorTool';
 import { TimerTool } from './TimerTool';
@@ -16,7 +15,6 @@ import { FinanceTool } from './FinanceTool';
 import { DateTimeTool } from './DateTimeTool';
 import { NotificationTool } from './NotificationTool';
 import { WebAppTool } from './WebAppTool';
-import { MessageDraftTool } from './MessageDraftTool';
 import { WikipediaTool } from './WikipediaTool';
 import { NewsTool } from './NewsTool';
 import { BackgroundTaskService } from '../BackgroundTaskService';
@@ -31,7 +29,6 @@ class ToolRegistryClass {
     private ttsMessages: Record<string, string> = {
         'web_search': "I'm searching the internet, please wait...",
         'deep_search': "I'm doing a deep search, this may take a moment...",
-        'play_media': "Finding that for you...",
         'get_weather': "Checking the forecast...",
         'calculator': "Calculating...",
         'set_timer': "Setting your timer...",
@@ -42,7 +39,6 @@ class ToolRegistryClass {
         'convert_currency': "Converting currency...",
         'set_reminder': "Setting a reminder for you...",
         'web_app_action': "Reading the web app, please wait...",
-        'draft_message': "Opening your mail or SMS app...",
         'wikipedia': "Looking that up on Wikipedia...",
         'get_news': "Fetching the latest news...",
         'default': "I'm working on something, please wait..."
@@ -52,7 +48,6 @@ class ToolRegistryClass {
         // Core tools
         this.registerTool(new WebSearchTool());
         this.registerTool(new DeepSearchTool());
-        this.registerTool(new MediaTool());
         this.registerTool(new WeatherTool());
 
         // New utility tools
@@ -70,7 +65,6 @@ class ToolRegistryClass {
         this.registerTool(new WebAppTool());
         
         // New tools (no API key required)
-        this.registerTool(new MessageDraftTool());
         this.registerTool(new WikipediaTool());
         this.registerTool(new NewsTool());
 
@@ -198,12 +192,6 @@ class ToolRegistryClass {
                 requiredStrings: ['prompt'],
                 stringConstraints: {
                     prompt: { max: 1000 }
-                }
-            },
-            play_media: {
-                requiredStrings: ['query'],
-                stringConstraints: {
-                    query: { max: 200 }
                 }
             },
             define_word: {

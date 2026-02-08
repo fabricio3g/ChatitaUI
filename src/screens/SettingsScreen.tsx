@@ -88,8 +88,6 @@ const AI_PROVIDERS: Record<string, any> = {
 };
 
 const STT_PROVIDERS = [
-    { id: 'expo_speech', name: 'Expo Speech', description: 'expo-speech-recognition (iOS/Android native)' },
-    { id: 'system', name: 'System (Device)', description: 'Use device built-in speech recognition' },
     ...(LOCAL_INFERENCE_ENABLED.STT ? [{ id: 'whisper_local', name: 'Whisper Local', description: 'On-device Whisper model (privacy-focused)' }] : []),
     { id: 'api', name: 'API (OpenAI/Custom)', description: 'Cloud-based transcription service' },
 ];
@@ -362,7 +360,7 @@ export const SettingsScreen = () => {
     const [ttsModel, setTtsModel] = useState('tts-1');
 
     // STT settings - ALWAYS INDEPENDENT
-    const [sttProvider, setSttProvider] = useState<STTProvider>('system');
+    const [sttProvider, setSttProvider] = useState<STTProvider>(LOCAL_INFERENCE_ENABLED.STT ? 'whisper_local' : 'api');
     const [sttApiKey, setSttApiKey] = useState('');
     const [sttBaseUrl, setSttBaseUrl] = useState('https://api.openai.com/v1');
     const [activeWhisperModel, setActiveWhisperModel] = useState<string>('whisper-tiny');
@@ -932,6 +930,7 @@ export const SettingsScreen = () => {
                 userPersona,
                 showReasoning,
                 streamingChunksEnabled,
+                simulatedToolsEnabled,
             });
 
             setStatusModal({ visible: true, type: 'success', title: 'Saved', message: 'Settings saved successfully' });
@@ -1070,7 +1069,7 @@ export const SettingsScreen = () => {
         try {
             const result = await DocumentPicker.getDocumentAsync({ type: '*/*' });
             if (!result.canceled && result.assets[0]) {
-                await loadLlamaModelFromFile(result.assets[0].uri);
+                await loadLlamaModelFromFile(result.assets[0].uri, result.assets[0].name);
                 await checkModelStatuses();
                 setStatusModal({
                     visible: true,
@@ -1488,7 +1487,7 @@ export const SettingsScreen = () => {
                         icon="mic"
                         isExpanded={expandedSections.includes('stt')}
                         onToggle={() => toggleSectionWithRefresh('stt')}
-                        badge={hasLocalInference() && sttProvider === 'whisper_local' ? 'Local' : sttProvider === 'api' ? 'API' : sttProvider === 'expo_speech' ? 'Expo' : 'System'}
+                        badge={hasLocalInference() && sttProvider === 'whisper_local' ? 'Local' : sttProvider === 'api' ? 'API' : 'Local'}
                         description={`Independent of operation mode. Current: ${STT_PROVIDERS.find(p => p.id === sttProvider)?.name || 'System'}`}
                     >
                         <ChipSelector
@@ -1640,14 +1639,6 @@ export const SettingsScreen = () => {
                         )}
 
                         {/* System provider info */}
-                        {sttProvider === 'system' && (
-                            <View style={[styles.infoBanner, { backgroundColor: theme.colors.info + '15' }]}>
-                                <Feather name="info" size={18} color={theme.colors.info} />
-                                <Text style={[styles.infoText, { color: theme.colors.info }]}>
-                                    Using your device's built-in speech recognition. No additional setup required.
-                                </Text>
-                            </View>
-                        )}
                     </CollapsibleSection>
 
                     {/* 3. Text to Speech Section */}

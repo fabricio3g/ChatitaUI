@@ -62,13 +62,15 @@ export const ChatInput: React.FC<Props> = ({
                 { borderColor }
             ]}>
                 {/* Tool button - simple icon */}
-                <Pressable
-                    style={styles.iconBtn}
-                    onPress={onMenuPress}
-                    disabled={disabled || isStreaming || !onMenuPress}
-                >
-                    <Feather name="plus" size={20} color={BW.gray600} />
-                </Pressable>
+                {onMenuPress ? (
+                    <Pressable
+                        style={styles.iconBtn}
+                        onPress={onMenuPress}
+                        disabled={disabled || isStreaming || !onMenuPress}
+                    >
+                        <Feather name="plus" size={20} color={BW.gray600} />
+                    </Pressable>
+                ) : null}
 
                 {/* Input field */}
                 <TextInput

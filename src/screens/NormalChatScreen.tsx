@@ -55,6 +55,7 @@ import { ErrorModal } from '../components/molecules/ErrorModal';
 import { EditMessageModal } from '../components/molecules/EditMessageModal';
 import { MemoizedMessageBubble } from '../components/atoms/MessageBubble';
 import { SettingsBus } from '../services/SettingsBus';
+import { getActiveLlamaModel, getDownloadedLlamaModels } from '../services/llm/llama/models';
 
 
 
@@ -93,6 +94,9 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [editingMessage, setEditingMessage] = useState<Message | null>(null);
     const [toolActivity, setToolActivity] = useState<ToolActivityEvent[]>([]);
+    const [isLocalGguf, setIsLocalGguf] = useState(false);
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
+    const [simulatedToolsEnabled, setSimulatedToolsEnabled] = useState(true);
     const [versionHistory, setVersionHistory] = useState<VersionHistory>({});
 
     // Mini-app state
@@ -193,6 +197,10 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
             if (v === null) return;
             setStreamingChunksEnabled(v === 'true');
         });
+        AsyncStorage.getItem('settings_simulatedToolsEnabled').then(v => {
+            if (v === null) return;
+            setSimulatedToolsEnabled(v === 'true');
+        });
 
         // Initialize STT service - auto-detects local Whisper models
         STTService.initialize().catch(err => {
@@ -211,6 +219,23 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
     }, []);
 
     useEffect(() => {
+        const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+            if (Platform.OS === 'android') {
+                setKeyboardHeight(e.endCoordinates?.height || 0);
+            }
+        });
+        const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+            if (Platform.OS === 'android') {
+                setKeyboardHeight(0);
+            }
+        });
+        return () => {
+            showSub.remove();
+            hideSub.remove();
+        };
+    }, []);
+
+    useEffect(() => {
         const unsubscribe = SettingsBus.subscribe(change => {
             if (change.userName !== undefined) setUserName(change.userName);
             if (change.model) setCurrentModel(change.model);
@@ -224,6 +249,12 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
             if (change.streamingChunksEnabled !== undefined) {
                 setStreamingChunksEnabled(change.streamingChunksEnabled);
             }
+            if (change.simulatedToolsEnabled !== undefined) {
+                setSimulatedToolsEnabled(change.simulatedToolsEnabled);
+            }
+            if (change.provider === 'llama_rn' || change.provider === undefined) {
+                refreshProviderAndModel();
+            }
         });
         return unsubscribe;
     }, []);
@@ -232,16 +263,29 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
         try {
             // Prefer in-memory config (Settings updates LLMService immediately)
             const cfg = LLMService.getConfig();
-            if (cfg?.model) setCurrentModel(cfg.model);
             if (cfg?.provider) checkVisionCapabilities(cfg.provider as LLMProviderId);
+            const isLocal = cfg?.provider === 'llama_rn' || cfg?.mode === 'local' || cfg?.localConfig?.llmModelId;
+            setIsLocalGguf(!!isLocal);
+            if (isLocal) {
+                const requestedId = cfg?.localConfig?.llmModelId || null;
+                const models = await getDownloadedLlamaModels();
+                let model = requestedId ? models.find(m => m.id === requestedId) : null;
+                if (!model) {
+                    const active = await getActiveLlamaModel();
+                    model = active || null;
+                }
+                setCurrentModel(model?.name || model?.id || 'Local GGUF');
+            } else if (cfg?.model) {
+                setCurrentModel(cfg.model);
+            }
 
             // Fallback to persisted settings (in case service not initialized yet)
             const [savedModel, savedProvider] = await AsyncStorage.multiGet([
                 'settings_model',
                 'settings_provider',
             ]);
-            if (savedModel?.[1]) setCurrentModel(savedModel[1]);
             if (savedProvider?.[1]) checkVisionCapabilities(savedProvider[1] as LLMProviderId);
+            if (!isLocal && savedModel?.[1]) setCurrentModel(savedModel[1]);
         } catch (e) {
             console.warn('[NormalChatScreen] Failed to refresh provider/model:', e);
         }
@@ -254,8 +298,19 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
                 if (v === null) return;
                 setStreamingChunksEnabled(v === 'true');
             });
+            AsyncStorage.getItem('settings_simulatedToolsEnabled').then(v => {
+                if (v === null) return;
+                setSimulatedToolsEnabled(v === 'true');
+            });
         }, [refreshProviderAndModel])
     );
+
+    useEffect(() => {
+        if (isLocalGguf && !simulatedToolsEnabled) {
+            setMenuVisible(false);
+            setActiveTool(null);
+        }
+    }, [isLocalGguf, simulatedToolsEnabled]);
 
     // Check vision capabilities when provider changes
     const checkVisionCapabilities = async (providerId: LLMProviderId) => {
@@ -552,18 +607,20 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
         const MAX_STEPS = 5;
         let pendingToolResponses: any[] = [];
 
+        const toolsEnabled = !isLocalGguf;
+
         // Inject tool instructions based on preferences (explicit so model calls the tool)
-        if (toolPrefs?.useDeepSearch && currentMessages.length > 0) {
+        if (toolsEnabled && toolPrefs?.useDeepSearch && currentMessages.length > 0) {
             const lastMsg = currentMessages[currentMessages.length - 1];
             if (lastMsg.role === 'user') {
                 lastMsg.content = `[REQUIRED: Call the deep_search tool to research this thoroughly. Extract a clear query and use deep_search(query="...").] ${lastMsg.content}`;
             }
-        } else if (toolPrefs?.useWebSearch && currentMessages.length > 0) {
+        } else if (toolsEnabled && toolPrefs?.useWebSearch && currentMessages.length > 0) {
             const lastMsg = currentMessages[currentMessages.length - 1];
             if (lastMsg.role === 'user') {
                 lastMsg.content = `[REQUIRED: Call the web_search tool with a query to get current information. Use web_search(query="...") with a short search query. Do not answer from memory—call the tool first.] ${lastMsg.content}`;
             }
-        } else if (toolPrefs?.useImageGen && currentMessages.length > 0) {
+        } else if (toolsEnabled && toolPrefs?.useImageGen && currentMessages.length > 0) {
             const lastMsg = currentMessages[currentMessages.length - 1];
             if (lastMsg.role === 'user') {
                 lastMsg.content = `[REQUIRED: Call the generate_image tool to create an image. Use generate_image(prompt="...").] ${lastMsg.content}`;
@@ -588,7 +645,7 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
             setIsStreaming(true);
             streamingRef.current = true;
 
-            const availableTools = ToolRegistry.getToolDefinitions();
+            const availableTools = toolsEnabled ? ToolRegistry.getToolDefinitions() : [];
 
             // On the last step, disable tools to force a final answer
             const isLastStep = stepCount >= MAX_STEPS - 1;
@@ -1148,34 +1205,37 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
         let useDeepSearch = false;
         let useWebSearch = false;
         let useImageGen = false;
+        const toolsEnabled = !isLocalGguf;
 
-        // 1. Prefer ref (set when user selected tool from menu) so we don't miss due to state timing
-        const pending = pendingToolPrefsRef.current;
-        if (pending) {
-            if (pending.useDeepSearch) useDeepSearch = true;
-            if (pending.useWebSearch) useWebSearch = true;
-            if (pending.useImageGen) useImageGen = true;
-            pendingToolPrefsRef.current = null;
-        }
-        // 2. Fallback to activeTool state (e.g. if ref was already consumed)
-        if (!useDeepSearch && !useWebSearch && !useImageGen) {
-            if (activeTool === 'Deep Research') useDeepSearch = true;
-            else if (activeTool === 'Web Search') useWebSearch = true;
-            else if (activeTool === 'Image Gen' || text.startsWith('/image ')) {
-                useImageGen = true;
-                if (text.startsWith('/image ')) finalText = text.replace('/image ', '');
+        if (toolsEnabled) {
+            // 1. Prefer ref (set when user selected tool from menu) so we don't miss due to state timing
+            const pending = pendingToolPrefsRef.current;
+            if (pending) {
+                if (pending.useDeepSearch) useDeepSearch = true;
+                if (pending.useWebSearch) useWebSearch = true;
+                if (pending.useImageGen) useImageGen = true;
+                pendingToolPrefsRef.current = null;
             }
-        }
-        if (useImageGen && typeof finalText === 'string' && finalText.startsWith('/image ')) {
-            finalText = finalText.replace('/image ', '');
-        }
+            // 2. Fallback to activeTool state (e.g. if ref was already consumed)
+            if (!useDeepSearch && !useWebSearch && !useImageGen) {
+                if (activeTool === 'Deep Research') useDeepSearch = true;
+                else if (activeTool === 'Web Search') useWebSearch = true;
+                else if (activeTool === 'Image Gen' || text.startsWith('/image ')) {
+                    useImageGen = true;
+                    if (text.startsWith('/image ')) finalText = text.replace('/image ', '');
+                }
+            }
+            if (useImageGen && typeof finalText === 'string' && finalText.startsWith('/image ')) {
+                finalText = finalText.replace('/image ', '');
+            }
 
-        // 3. Natural language: detect search intent when no tool was selected
-        if (!useWebSearch && !useDeepSearch) {
-            const trimmed = (typeof finalText === 'string' ? finalText : '').trim().toLowerCase();
-            if (/^(search|look up|find out|google|web search|look for|find)\s+(for\s+)?(about\s+)?/i.test(trimmed) ||
-                /\b(search|look up|google|find)\s+(for\s+)?(about\s+)?\w+/i.test(trimmed)) {
-                useWebSearch = true;
+            // 3. Natural language: detect search intent when no tool was selected
+            if (!useWebSearch && !useDeepSearch) {
+                const trimmed = (typeof finalText === 'string' ? finalText : '').trim().toLowerCase();
+                if (/^(search|look up|find out|google|web search|look for|find)\s+(for\s+)?(about\s+)?/i.test(trimmed) ||
+                    /\b(search|look up|google|find)\s+(for\s+)?(about\s+)?\w+/i.test(trimmed)) {
+                    useWebSearch = true;
+                }
             }
         }
 
@@ -1494,6 +1554,8 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
         });
     }, []);
 
+    const toolsEnabled = !isLocalGguf || simulatedToolsEnabled;
+
     return (
         <Drawer
             visible={sidebarVisible}
@@ -1534,7 +1596,11 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
                     </Pressable>
                 </View>
 
-                <View style={styles.keyboardContainer}>
+                <KeyboardAvoidingView
+                    style={styles.keyboardContainer}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+                >
                     {displayMessages.length === 0 ? (
                         <View style={styles.welcomeWrapper}>
                             <WelcomeScreen userName={userName} />
@@ -1577,10 +1643,11 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
                         </View>
                     )}
 
-                    <KeyboardAvoidingView
-                        style={styles.inputDock}
-                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 12}
+                    <View
+                        style={[
+                            styles.inputDock,
+                            { paddingBottom: Math.max(insets.bottom, 8) + (Platform.OS === 'android' ? keyboardHeight : 0) }
+                        ]}
                     >
                         {/* Floating Input Container */}
                         <View style={styles.floatingInputContainer}>
@@ -1637,10 +1704,10 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
                                     }}
                                     disabled={isStreaming}
                                     isStreaming={isStreaming}
-                                    onMenuPress={() => {
+                                    onMenuPress={toolsEnabled ? () => {
                                         Keyboard.dismiss();
                                         setMenuVisible(true);
-                                    }}
+                                    } : undefined}
                                     onDictationStart={handleDictationStart}
                                     onDictationEnd={handleDictationEnd}
                                     isDictating={isDictating}
@@ -1681,12 +1748,12 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
 
                                 {/* Deep Research MiniApp removed - now uses chat-based flow */}
                         </View>
-                    </KeyboardAvoidingView>
-                </View>
+                    </View>
+                </KeyboardAvoidingView>
 
                 {/* Mini-app Menu (mounted at screen level to fully block underlying chat touches) */}
                 <ChatInputMenu
-                    visible={menuVisible}
+                    visible={toolsEnabled && menuVisible}
                     onClose={() => setMenuVisible(false)}
                     onSelect={(appId) => {
                         setMenuVisible(false);
@@ -1900,6 +1967,9 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     keyboardContainer: { flex: 1 },
+    inputDock: {
+        backgroundColor: 'transparent',
+    },
     listContainer: { flex: 1, position: 'relative' },
     messageList: { paddingVertical: 16, paddingBottom: 40 },
 

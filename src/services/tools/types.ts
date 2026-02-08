@@ -6,7 +6,7 @@ export interface ToolParameter {
 }
 
 // Tool render types for UI widgets
-export type ToolRenderType = 'media' | 'web_card' | 'weather_card' | 'error' | 'calculator' | 'timer' | 'translate' | 'definition' | 'unit' | 'countdown' | 'currency' | 'image_generated' | 'finance_card' | 'datetime_card' | 'notification' | 'message_draft' | 'web_app' | 'background_task';
+export type ToolRenderType = 'web_card' | 'weather_card' | 'error' | 'calculator' | 'timer' | 'translate' | 'definition' | 'unit' | 'countdown' | 'currency' | 'image_generated' | 'finance_card' | 'datetime_card' | 'notification' | 'web_app' | 'background_task';
 
 // Base Tool Definition
 export interface ToolDefinition {

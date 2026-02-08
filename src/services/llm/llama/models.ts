@@ -17,12 +17,40 @@ import {
 } from "./GGUFMetadata";
 
 // Storage paths
-const LLAMA_CACHE_DIR = `${FileSystem.cacheDirectory}llama/`;
+const LLAMA_STORE_DIR = `${FileSystem.documentDirectory}llama/`;
+const LEGACY_LLAMA_CACHE_DIR = `${FileSystem.cacheDirectory}llama/`;
 const SETTINGS_ACTIVE_LLAMA_MODEL = "settings_activeLlamaModel";
 const SETTINGS_LLAMA_DOWNLOAD_PROGRESS = "settings_llamaDownloadProgress";
 
 function normalizeLocalId(name: string): string {
   return name.startsWith("local-") ? name : `local-${name}`;
+}
+
+async function ensureLlamaStoreDir(): Promise<void> {
+  const storeDir = await FileSystem.getInfoAsync(LLAMA_STORE_DIR);
+  if (!storeDir.exists) {
+    await FileSystem.makeDirectoryAsync(LLAMA_STORE_DIR, { intermediates: true });
+  }
+}
+
+async function migrateLegacyCacheToStore(): Promise<void> {
+  const legacyDir = await FileSystem.getInfoAsync(LEGACY_LLAMA_CACHE_DIR);
+  if (!legacyDir.exists) return;
+
+  await ensureLlamaStoreDir();
+
+  const legacyFiles = await FileSystem.readDirectoryAsync(LEGACY_LLAMA_CACHE_DIR);
+  for (const file of legacyFiles) {
+    const from = `${LEGACY_LLAMA_CACHE_DIR}${file}`;
+    const to = `${LLAMA_STORE_DIR}${file}`;
+    try {
+      const destInfo = await FileSystem.getInfoAsync(to);
+      if (destInfo.exists) continue;
+      await FileSystem.moveAsync({ from, to });
+    } catch (e) {
+      console.warn("Failed to migrate legacy GGUF file:", file, e);
+    }
+  }
 }
 
 /**
@@ -184,12 +212,7 @@ export function downloadLlamaModel(
   const promise = (async (): Promise<string> => {
     const modelKey = model.id;
 
-    const cacheDir = await FileSystem.getInfoAsync(LLAMA_CACHE_DIR);
-    if (!cacheDir.exists) {
-      await FileSystem.makeDirectoryAsync(LLAMA_CACHE_DIR, {
-        intermediates: true,
-      });
-    }
+    await ensureLlamaStoreDir();
 
     await AsyncStorage.setItem(
       SETTINGS_LLAMA_DOWNLOAD_PROGRESS,
@@ -199,7 +222,7 @@ export function downloadLlamaModel(
     if (!model.url) throw new Error("Model URL not provided");
 
     const fileName = `${model.id}.gguf`;
-    const fileUri = `${LLAMA_CACHE_DIR}${fileName}`;
+    const fileUri = `${LLAMA_STORE_DIR}${fileName}`;
 
     const fileInfo = await FileSystem.getInfoAsync(fileUri);
     if (fileInfo.exists) {
@@ -230,7 +253,7 @@ export function downloadLlamaModel(
 
     if (model.mmprojUrl) {
       const mmprojFileName = `${model.id}.mmproj`;
-      const mmprojUri = `${LLAMA_CACHE_DIR}${mmprojFileName}`;
+      const mmprojUri = `${LLAMA_STORE_DIR}${mmprojFileName}`;
       mmprojResumable = FileSystem.createDownloadResumable(
         model.mmprojUrl,
         mmprojUri,
@@ -254,8 +277,8 @@ export function downloadLlamaModel(
       console.warn("Error pausing download:", e);
     }
     try {
-      await FileSystem.deleteAsync(`${LLAMA_CACHE_DIR}${model.id}.gguf`, { idempotent: true });
-      await FileSystem.deleteAsync(`${LLAMA_CACHE_DIR}${model.id}.mmproj`, { idempotent: true });
+      await FileSystem.deleteAsync(`${LLAMA_STORE_DIR}${model.id}.gguf`, { idempotent: true });
+      await FileSystem.deleteAsync(`${LLAMA_STORE_DIR}${model.id}.mmproj`, { idempotent: true });
     } catch (e) {
       console.warn("Error deleting partial files:", e);
     }
@@ -270,14 +293,16 @@ export function downloadLlamaModel(
 export async function getDownloadedLlamaModels(): Promise<LlamaModelState[]> {
   const models: LlamaModelState[] = [];
 
-  // Check cache directory
-  const cacheDir = await FileSystem.getInfoAsync(LLAMA_CACHE_DIR);
-  if (!cacheDir.exists) {
+  await migrateLegacyCacheToStore();
+
+  // Check store directory
+  const storeDir = await FileSystem.getInfoAsync(LLAMA_STORE_DIR);
+  if (!storeDir.exists) {
     return models;
   }
 
-  // Get all files in cache directory
-  const files = await FileSystem.readDirectoryAsync(LLAMA_CACHE_DIR);
+  // Get all files in store directory
+  const files = await FileSystem.readDirectoryAsync(LLAMA_STORE_DIR);
 
   // Process each .gguf file and match against presets
   const allPresets = [
@@ -290,7 +315,7 @@ export async function getDownloadedLlamaModels(): Promise<LlamaModelState[]> {
     if (!file.endsWith(".gguf")) continue;
 
     const fileName = file.replace(".gguf", "");
-    const fileUri = `${LLAMA_CACHE_DIR}${file}`;
+    const fileUri = `${LLAMA_STORE_DIR}${file}`;
 
     // Try to match against presets
     const matchedModel = allPresets.find((m) => m.id === fileName);
@@ -336,8 +361,8 @@ export async function getDownloadedLlamaModels(): Promise<LlamaModelState[]> {
  * Delete downloaded Llama model
  */
 export async function deleteLlamaModel(modelId: string): Promise<void> {
-  const ggufUri = `${LLAMA_CACHE_DIR}${modelId}.gguf`;
-  const mmprojUri = `${LLAMA_CACHE_DIR}${modelId}.mmproj`;
+  const ggufUri = `${LLAMA_STORE_DIR}${modelId}.gguf`;
+  const mmprojUri = `${LLAMA_STORE_DIR}${modelId}.mmproj`;
 
   try {
     const ggufInfo = await FileSystem.getInfoAsync(ggufUri);
@@ -388,9 +413,9 @@ export async function getActiveLlamaModel(): Promise<LlamaModelState | null> {
 /**
  * Load local GGUF model from device storage
  */
-export async function loadLlamaModelFromFile(fileUri: string): Promise<string> {
+export async function loadLlamaModelFromFile(fileUri: string, originalFileName?: string): Promise<string> {
   // Validate file extension
-  const fileName = fileUri.split("/").pop() || "";
+  const fileName = (originalFileName || fileUri.split("/").pop() || "").trim();
   if (!fileName.endsWith(".gguf")) {
     throw new Error("Only .gguf files are supported for local models");
   }
@@ -406,16 +431,11 @@ export async function loadLlamaModelFromFile(fileUri: string): Promise<string> {
   }
 
   // Create cache directory if it doesn't exist
-  const cacheDir = await FileSystem.getInfoAsync(LLAMA_CACHE_DIR);
-  if (!cacheDir.exists) {
-    await FileSystem.makeDirectoryAsync(LLAMA_CACHE_DIR, {
-      intermediates: true,
-    });
-  }
+  await ensureLlamaStoreDir();
 
   // Copy to cache directory
   const targetFileName = `${localBase}.gguf`;
-  const targetUri = `${LLAMA_CACHE_DIR}${targetFileName}`;
+  const targetUri = `${LLAMA_STORE_DIR}${targetFileName}`;
 
   await FileSystem.copyAsync({
     from: fileUri,
@@ -548,14 +568,11 @@ export async function importModelWithMetadata(
     }
 
     // Create cache directory if needed
-    const cacheDir = await FileSystem.getInfoAsync(LLAMA_CACHE_DIR);
-    if (!cacheDir.exists) {
-      await FileSystem.makeDirectoryAsync(LLAMA_CACHE_DIR, { intermediates: true });
-    }
+    await ensureLlamaStoreDir();
 
     // Copy to cache
     const targetFileName = `${localBase}.gguf`;
-    const targetUri = `${LLAMA_CACHE_DIR}${targetFileName}`;
+    const targetUri = `${LLAMA_STORE_DIR}${targetFileName}`;
 
     await FileSystem.copyAsync({ from: fileUri, to: targetUri });
 
@@ -599,19 +616,21 @@ export async function importModelWithMetadata(
 export async function getDownloadedModelsWithMetadata(): Promise<LlamaModelState[]> {
   const models: LlamaModelState[] = [];
 
-  const cacheDir = await FileSystem.getInfoAsync(LLAMA_CACHE_DIR);
-  if (!cacheDir.exists) {
+  await migrateLegacyCacheToStore();
+
+  const storeDir = await FileSystem.getInfoAsync(LLAMA_STORE_DIR);
+  if (!storeDir.exists) {
     return models;
   }
 
-  const files = await FileSystem.readDirectoryAsync(LLAMA_CACHE_DIR);
+  const files = await FileSystem.readDirectoryAsync(LLAMA_STORE_DIR);
   const allPresets = [...EFFICIENT_TEXT_PRESETS, ...VISUAL_MODELS, ...AUDIO_MODELS];
 
   for (const file of files) {
     if (!file.endsWith(".gguf")) continue;
 
     const fileName = file.replace(".gguf", "");
-    const fileUri = `${LLAMA_CACHE_DIR}${file}`;
+    const fileUri = `${LLAMA_STORE_DIR}${file}`;
 
     // Try to match preset first
     const matchedPreset = allPresets.find((m) => m.id === fileName);

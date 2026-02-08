@@ -10,33 +10,29 @@ interface WikiSummary {
     title: string;
     extract: string;
     description?: string;
-    thumbnail?: { source: string; width: number; height: number };
     content_urls?: { desktop: { page: string }; mobile: { page: string } };
 }
 
 export class WikipediaTool implements Tool {
     definition: ToolDefinition = {
         name: 'wikipedia',
-        description: 'Get a Wikipedia summary for a topic. Returns a brief extract, description, and link to the full article.',
+        description: 'Get a Wikipedia summary for a topic in English. Returns a brief extract, description, and link to the full article.',
         parameters: {
             type: 'object',
             properties: {
                 topic: {
                     type: 'string',
                     description: 'The topic to look up on Wikipedia'
-                },
-                language: {
-                    type: 'string',
-                    description: 'Wikipedia language code (default: "en"). Examples: "en", "es", "fr", "de", "pt", "ja", "zh"'
                 }
             },
             required: ['topic']
         }
     };
 
-    async execute(params: { topic: string; language?: string }): Promise<ToolResponse> {
+    async execute(params: { topic: string }): Promise<ToolResponse> {
         try {
-            const { topic, language = 'en' } = params;
+            const { topic } = params;
+            const language = 'en';
             const cleanTopic = topic.trim().replace(/\s+/g, '_');
             const encodedTopic = encodeURIComponent(cleanTopic);
 
@@ -65,7 +61,6 @@ export class WikipediaTool implements Tool {
                         title: data.title,
                         description: data.description,
                         extract,
-                        thumbnail: data.thumbnail?.source,
                         url: articleUrl,
                         language
                     }
