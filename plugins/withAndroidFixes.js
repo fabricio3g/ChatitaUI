@@ -9,9 +9,47 @@
  *   ["./plugins/withAndroidFixes"]
  */
 
-const { withAndroidManifest } = require('@expo/config-plugins');
+const { withAndroidManifest, withGradleProperties, withAppBuildGradle } = require('@expo/config-plugins');
 
 function withAndroidFixes(config) {
+    config = withGradleProperties(config, (config) => {
+        const props = config.modResults;
+        const setProp = (key, value) => {
+            const existing = props.find((p) => p.type === 'property' && p.key === key);
+            if (existing) {
+                existing.value = value;
+            } else {
+                props.push({ type: 'property', key, value });
+            }
+        };
+
+        setProp('android.useAndroidX', 'true');
+        setProp('android.enableJetifier', 'true');
+        return config;
+    });
+
+    config = withAppBuildGradle(config, (config) => {
+        const src = config.modResults.contents;
+        if (src.includes('configurations.all') && src.includes("exclude group: 'com.android.support'")) {
+            return config;
+        }
+
+        const marker = 'android {';
+        if (!src.includes(marker)) {
+            return config;
+        }
+
+        const insert = `
+
+// Avoid legacy support libraries pulled by transitive deps
+configurations.all {
+    exclude group: 'com.android.support'
+}
+`;
+        config.modResults.contents = src.replace(marker, `${marker}${insert}`);
+        return config;
+    });
+
     return withAndroidManifest(config, async (config) => {
         const manifest = config.modResults;
 
