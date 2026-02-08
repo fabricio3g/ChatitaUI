@@ -3,12 +3,7 @@
  * ChatGPT-inspired clean design
  */
 
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require('./global.css');
-} catch {
-  // NativeWind not installed yet
-}
+import './global.css';
 
 import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';

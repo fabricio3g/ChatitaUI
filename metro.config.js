@@ -1,4 +1,5 @@
 const { getDefaultConfig } = require('expo/metro-config');
+const { withNativeWind } = require('nativewind/metro');
 
 const config = getDefaultConfig(__dirname);
 
@@ -25,11 +26,4 @@ config.server = {
   },
 };
 
-// Keep repo runnable even before nativewind deps are installed.
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { withNativewind } = require('nativewind/metro');
-  module.exports = withNativewind(config);
-} catch {
-  module.exports = config;
-}
+module.exports = withNativeWind(config, { input: './global.css' });

@@ -188,7 +188,7 @@ export class DeepSearchTool implements Tool {
 
     private async searchWikipedia(query: string): Promise<{ title: string; url: string; summary: string; thumbnail?: string } | null> {
         try {
-            const headers = { 'User-Agent': 'Kokoro-TTS-Go/1.0 (contact@example.com)' };
+            const headers = { 'User-Agent': 'ChatitaUI/1.0 (contact@example.com)' };
             const searchUrl = `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=1&namespace=0&format=json`;
             const searchRes = await fetch(searchUrl, { headers });
 
