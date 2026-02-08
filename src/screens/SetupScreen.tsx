@@ -18,7 +18,7 @@ import { useTheme } from '../context/ThemeContext';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChipSelector, CompactInput, CompactSwitch, SettingsSection } from '../components/molecules/SettingsComponents';
+import { ChipSelector, CompactInput, CompactSwitch, SettingsSection } from '../components/common/SettingsComponents';
 import { LOCAL_INFERENCE_ENABLED } from '../config/localInference';
 import { LLMService } from '../services/llm/LLMService';
 import { Button, Screen } from '../ui';

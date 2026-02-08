@@ -9,14 +9,24 @@ ANDROID_DIR="$PROJECT_DIR/android"
 log() { printf "[build-release] %s\n" "$1"; }
 
 SKIP_PREBUILD=false
+VERSION_NAME=""
+VERSION_CODE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-prebuild)
       SKIP_PREBUILD=true
       shift
       ;;
+    --version-name)
+      VERSION_NAME="${2:-}"
+      shift 2
+      ;;
+    --version-code)
+      VERSION_CODE="${2:-}"
+      shift 2
+      ;;
     -h|--help)
-      echo "Usage: $0 [--skip-prebuild]"
+      echo "Usage: $0 [--skip-prebuild] [--version-name X.Y.Z] [--version-code N]"
       exit 0
       ;;
     *)
@@ -58,6 +68,15 @@ cd "$ANDROID_DIR"
 
 # Allow custom Gradle cache dir
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$PROJECT_DIR/.gradle}"
+
+if [[ -n "$VERSION_NAME" ]]; then
+  export ORG_GRADLE_PROJECT_VERSION_NAME="$VERSION_NAME"
+  log "Using VERSION_NAME: $VERSION_NAME"
+fi
+if [[ -n "$VERSION_CODE" ]]; then
+  export ORG_GRADLE_PROJECT_VERSION_CODE="$VERSION_CODE"
+  log "Using VERSION_CODE: $VERSION_CODE"
+fi
 
 ./gradlew assembleRelease
 

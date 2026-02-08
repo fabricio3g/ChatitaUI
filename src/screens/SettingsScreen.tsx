@@ -24,7 +24,7 @@ import { useTheme } from '../context/ThemeContext';
 import { LLMService } from '../services/llm/LLMService';
 import { LLMProviderId, ModelMode } from '../services/llm/types';
 import { useNavigation } from '@react-navigation/native';
-import { StatusModal } from '../components/molecules/StatusModal';
+import { StatusModal } from '../components/common/StatusModal';
 import { ThemeName } from '../theme';
 import { STTProviderType as STTProvider, STTService } from '../services/stt/STTService';
 import { TTSService } from '../services/tts/TTSService';

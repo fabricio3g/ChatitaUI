@@ -69,13 +69,13 @@ const ConversationItem = memo<{
                 ]}
                 onPress={handlePress}
             >
-                    <View style={[styles.convIconWrap, { backgroundColor: theme.colors.surfaceHighlight }]}>
-                        <Feather
-                            name={type === 'search' ? 'search' : 'message-circle'}
-                            size={12}
-                            color={theme.colors.textSecondary}
-                        />
-                    </View>
+                <View style={[styles.convIconWrap, { backgroundColor: theme.colors.surfaceHighlight }]}>
+                    <Feather
+                        name={type === 'search' ? 'search' : 'message-circle'}
+                        size={12}
+                        color={theme.colors.textSecondary}
+                    />
+                </View>
                 <View style={styles.convContent}>
                     <Text style={[styles.convTitle, { color: theme.colors.text }]} numberOfLines={1}>
                         {title}
@@ -87,7 +87,10 @@ const ConversationItem = memo<{
             </Pressable>
             <Pressable
                 onPress={handleDelete}
-                style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.6 }]}
+                style={({ pressed }) => [
+                    styles.deleteBtn,
+                    { backgroundColor: pressed ? theme.colors.surfaceHighlight : 'transparent' },
+                ]}
                 hitSlop={8}
             >
                 <Feather name="trash-2" size={14} color={theme.colors.textTertiary} />
@@ -386,19 +389,22 @@ const styles = StyleSheet.create({
     emptyText: { fontSize: 14 },
     conversationRow: {
         flexDirection: 'row',
-        alignItems: 'stretch',
+        alignItems: 'center',
         borderBottomWidth: StyleSheet.hairlineWidth,
-        marginBottom: 4,
+        borderRadius: 8,
+        paddingHorizontal: 6,
+        marginBottom: 6,
+        minHeight: 44,
     },
     conversationItem: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        paddingVertical: 6,
+        gap: 8,
+        paddingVertical: 8,
         paddingLeft: 4,
-        paddingRight: 6,
-        minHeight: 40,
+        paddingRight: 8,
+        minHeight: 44,
     },
     convIconWrap: {
         width: 28,
@@ -422,8 +428,9 @@ const styles = StyleSheet.create({
         fontWeight: '400',
     },
     deleteBtn: {
-        paddingVertical: 6,
-        paddingHorizontal: 4,
+        width: 36,
+        height: 36,
+        borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
     },

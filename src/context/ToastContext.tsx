@@ -5,7 +5,7 @@
  */
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { Toast } from '../components/atoms/Toast';
+import { Toast } from '../components/ui/Toast';
 
 type ToastType = 'info' | 'success' | 'warning' | 'error';
 

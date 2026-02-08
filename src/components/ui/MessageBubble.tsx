@@ -12,8 +12,8 @@ import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { Message } from '../../types/message';
-import { MessageContent } from '../molecules/MessageContent';
-import { ConfirmModal } from '../molecules/ConfirmModal';
+import { MessageContent } from '../common/MessageContent';
+import { ConfirmModal } from '../common/ConfirmModal';
 
 interface VersionInfo {
     versions: Message[];

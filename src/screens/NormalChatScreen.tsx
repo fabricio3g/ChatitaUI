@@ -7,17 +7,11 @@ import {
     View,
     Text,
     StyleSheet,
-    ScrollView,
-    TextInput,
     Pressable,
     FlatList,
     KeyboardAvoidingView,
     Platform,
-    RefreshControl,
-    Linking,
     Keyboard,
-    Dimensions,
-    Modal,
     Image
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,29 +25,29 @@ import { Attachment } from '../types/document';
 import { Message, MessageContentPart } from '../types/message';
 import { STTService } from '../services/stt/STTService';
 import { TTSService } from '../services/tts/TTSService';
-import { DictationOverlay } from '../components/molecules/DictationOverlay';
+import { DictationOverlay } from '../components/common/DictationOverlay';
 import { VisionService } from '../services/llm/VisionService';
 import { LLMProviderId } from '../services/llm/types';
 import { LLMService } from '../services/llm/LLMService';
 import { DatabaseService } from '../services/DatabaseService';
-import { Drawer } from '../components/organisms/Drawer';
-import { Sidebar } from '../components/organisms/Sidebar';
+import { Drawer } from '../components/layout/Drawer';
+import { Sidebar } from '../components/layout/Sidebar';
 import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
-import { WelcomeScreen } from '../components/molecules/WelcomeScreen';
-import { ToolActivityFeed, ToolActivityEvent } from '../components/molecules/ToolActivityFeed';
+import { WelcomeScreen } from '../components/common/WelcomeScreen';
+import { ToolActivityFeed, ToolActivityEvent } from '../components/common/ToolActivityFeed';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ToolRegistry } from '../services/tools/ToolRegistry';
 import { APIToolCall } from '../types/message';
-import { AttachmentPreview } from '../components/molecules/AttachmentPreview';
-import { ChatInput } from '../components/molecules/ChatInput';
-import { ChatInputMenu } from '../components/molecules/ChatInputMenu';
-import { QuizMiniApp } from '../components/molecules/QuizMiniApp';
-import { MiniAppMode } from '../components/molecules/MiniAppTypes';
-import { BrowserBubble } from '../components/molecules/BrowserBubble';
-import { ErrorModal } from '../components/molecules/ErrorModal';
-import { EditMessageModal } from '../components/molecules/EditMessageModal';
-import { MemoizedMessageBubble } from '../components/atoms/MessageBubble';
+import { AttachmentPreview } from '../components/common/AttachmentPreview';
+import { ChatInput } from '../components/common/ChatInput';
+import { ChatInputMenu } from '../components/common/ChatInputMenu';
+import { QuizMiniApp } from '../components/common/QuizMiniApp';
+import { MiniAppMode } from '../components/common/MiniAppTypes';
+import { BrowserBubble } from '../components/common/BrowserBubble';
+import { ErrorModal } from '../components/common/ErrorModal';
+import { EditMessageModal } from '../components/common/EditMessageModal';
+import { MemoizedMessageBubble } from '../components/ui/MessageBubble';
 import { SettingsBus } from '../services/SettingsBus';
 import { getActiveLlamaModel, getDownloadedLlamaModels } from '../services/llm/llama/models';
 
@@ -109,7 +103,6 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [visionMode, setVisionMode] = useState(false);
 
-    // Dictation state
     const [isDictating, setIsDictating] = useState(false);
     const [dictationLevel, setDictationLevel] = useState(-160);
     const [dictationProvider, setDictationProvider] = useState<'system' | 'expo_speech' | 'api' | 'whisper_local' | null>(null);
@@ -118,7 +111,6 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
     const [showReasoning, setShowReasoning] = useState(true);
     const [streamingChunksEnabled, setStreamingChunksEnabled] = useState(true);
 
-    // Performance: Throttle refs
     const pendingUpdateRef = useRef<{ content: string; thinking: string; tokenUsage: any } | null>(null);
     const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const addedToMessagesRef = useRef(false);
@@ -128,7 +120,7 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
     const autoScrollRef = useRef(true);
     const userScrollingRef = useRef(false);
     const lastAutoScrollAtRef = useRef(0);
-    // Ref for tool prefs so send sees the tool even if state hasn't updated yet (menu -> send timing)
+
     const pendingToolPrefsRef = useRef<{ useDeepSearch?: boolean; useWebSearch?: boolean; useImageGen?: boolean } | null>(null);
 
     const pushToolActivity = useCallback(
@@ -169,16 +161,13 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
         };
         checkOnline();
 
-        // Simple device tier detection
+        
         const detectDeviceTier = () => {
-            // In a real implementation, this would check RAM, GPU, etc.
-            // For now, default to medium
             setDeviceTier('medium');
         };
         detectDeviceTier();
     }, []);
 
-    // Load settings and initialize services
     useEffect(() => {
         AsyncStorage.getItem('settings_userName').then(name => name && setUserName(name));
         AsyncStorage.getItem('settings_model').then(model => model && setCurrentModel(model));
@@ -1748,12 +1737,11 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
                                     />
                                 )}
 
-                                {/* Deep Research MiniApp removed - now uses chat-based flow */}
+                               
                         </View>
                     </View>
                 </KeyboardAvoidingView>
 
-                {/* Mini-app Menu (mounted at screen level to fully block underlying chat touches) */}
                 <ChatInputMenu
                     visible={toolsEnabled && menuVisible}
                     onClose={() => setMenuVisible(false)}
@@ -1787,7 +1775,6 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
     );
 };
 
-// Extracted MessageItem component for better memoization
 interface MessageItemProps {
     item: Message;
     index: number;
@@ -1853,7 +1840,6 @@ const MessageItem: React.FC<MessageItemProps> = memo(({
     );
 });
 
-// Memoized FlatList component
 interface MessageListProps {
     messages: Message[];
     versionHistory: VersionHistory;
@@ -1910,20 +1896,19 @@ const MemoizedMessageList: React.FC<MessageListProps> = memo(({
             renderItem={renderItem}
             contentContainerStyle={styles.messageList}
             showsVerticalScrollIndicator={false}
-            // Performance optimizations for large chat histories
-            initialNumToRender={10}           // Render 10 items initially (good balance)
-            maxToRenderPerBatch={5}            // Render 5 at a time during scroll (reduced from 10)
-            windowSize={5}                     // Keep 5 pages worth of items in memory (reduced from 10)
-            removeClippedSubviews={true}        // Remove off-screen views from native hierarchy
+            initialNumToRender={10}           
+            maxToRenderPerBatch={5}            
+            windowSize={5}                     
+            removeClippedSubviews={true}        
             onScroll={onScroll}
             onScrollBeginDrag={onScrollBeginDrag}
             onScrollEndDrag={onScrollEndDrag}
             onContentSizeChange={onContentSizeChange}
             scrollEventThrottle={16}
-            // Additional optimizations for 2025
-            updateCellsBatchingPeriod={50}      // Batch updates every 50ms (smoother scrolling)
-            legacyImplementation={false}        // Use new implementation (better performance)
-            onEndReachedThreshold={0.5}         // Trigger earlier for smoother infinite scroll
+      
+            updateCellsBatchingPeriod={50}      
+            legacyImplementation={false}        
+            onEndReachedThreshold={0.5}         
         />
     );
 });

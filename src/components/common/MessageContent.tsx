@@ -10,7 +10,7 @@ import React, { useMemo, useState, useEffect, memo, useRef } from 'react';
 import { View, Text, StyleSheet, Linking, Pressable, Dimensions } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { useTheme } from '../../context/ThemeContext';
-import { MathBubble } from '../atoms/MathBubble';
+import { MathBubble } from '../ui/MathBubble';
 import { CodeBlock } from './CodeBlock';
 import { ToolWidget } from './ToolWidget';
 import { ToolResponse } from '../../services/tools/types';
