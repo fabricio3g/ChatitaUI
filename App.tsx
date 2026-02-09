@@ -19,7 +19,6 @@ import { AppNavigator } from './src/navigation/AppNavigator';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ErrorBoundaryWrapper } from './src/components/ErrorBoundary';
 import { AudioDecoderWebView } from './src/components/AudioDecoderWebView';
-import { PdfExtractorWebView } from './src/components/PdfExtractorWebView';
 import { LOCAL_INFERENCE_ENABLED } from './src/config/localInference';
 
 const applyGlobalFontDefaults = () => {
@@ -73,9 +72,8 @@ export default function App() {
         <StatusBar style="dark" />
         {/* Hidden WebView for audio decoding (required for Whisper STT) */}
         {LOCAL_INFERENCE_ENABLED.STT && <AudioDecoderWebView />}
-        {/* Hidden WebView for PDF text extraction (PDF.js) */}
-        <PdfExtractorWebView />
       </GestureHandlerRootView>
     </ErrorBoundaryWrapper>
   );
 }
+

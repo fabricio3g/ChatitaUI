@@ -10,6 +10,7 @@ import {
     StyleSheet,
     Pressable,
     Modal,
+    TouchableOpacity,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
@@ -61,41 +62,52 @@ const ConversationItem = memo<{
     }, [id, onDelete]);
 
     return (
-        <View style={[styles.conversationRow, { borderBottomColor: theme.colors.border }]}>
-            <Pressable
-                style={({ pressed }) => [
-                    styles.conversationItem,
-                    { backgroundColor: pressed ? theme.colors.surfaceHighlight : 'transparent' }
-                ]}
-                onPress={handlePress}
+        <TouchableOpacity
+            onPress={handlePress}
+            activeOpacity={0.7}
+            style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+                borderBottomWidth: StyleSheet.hairlineWidth,
+                borderBottomColor: theme.colors.border,
+            }}
+        >
+            <Feather
+                name={type === 'search' ? 'search' : 'message-circle'}
+                size={20}
+                color={theme.colors.textSecondary}
+            />
+            <Text
+                numberOfLines={1}
+                style={{
+                    flex: 1,
+                    fontSize: 15,
+                    fontWeight: '500',
+                    marginHorizontal: 12,
+                    color: theme.colors.text,
+                }}
             >
-                <View style={[styles.convIconWrap, { backgroundColor: theme.colors.surfaceHighlight }]}>
-                    <Feather
-                        name={type === 'search' ? 'search' : 'message-circle'}
-                        size={12}
-                        color={theme.colors.textSecondary}
-                    />
-                </View>
-                <View style={styles.convContent}>
-                    <Text style={[styles.convTitle, { color: theme.colors.text }]} numberOfLines={1}>
-                        {title}
-                    </Text>
-                    <Text style={[styles.convTime, { color: theme.colors.textTertiary }]}>
-                        {formatTime(timestamp)}
-                    </Text>
-                </View>
-            </Pressable>
-            <Pressable
-                onPress={handleDelete}
-                style={({ pressed }) => [
-                    styles.deleteBtn,
-                    { backgroundColor: pressed ? theme.colors.surfaceHighlight : 'transparent' },
-                ]}
-                hitSlop={8}
+                {title}
+            </Text>
+            <Text style={{
+                fontSize: 11,
+                color: theme.colors.textTertiary,
+                marginRight: 8,
+            }}>
+                {formatTime(timestamp)}
+            </Text>
+            <TouchableOpacity
+                onPress={(e) => {
+                    e.stopPropagation?.();
+                    handleDelete();
+                }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-                <Feather name="trash-2" size={14} color={theme.colors.textTertiary} />
-            </Pressable>
-        </View>
+                <Feather name="trash-2" size={16} color={theme.colors.textTertiary} />
+            </TouchableOpacity>
+        </TouchableOpacity>
     );
 });
 
@@ -302,7 +314,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, navigation }
                                 theme={theme}
                             />
                         )}
-                        contentContainerStyle={{ padding: 16, paddingTop: 8, paddingBottom: insets.bottom + 120 }}
+                        contentContainerStyle={{ paddingTop: 8, paddingBottom: insets.bottom + 120 }}
                         showsVerticalScrollIndicator={false}
                     />
                 )}
@@ -390,47 +402,38 @@ const styles = StyleSheet.create({
     conversationRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderRadius: 8,
-        paddingHorizontal: 6,
-        marginBottom: 6,
-        minHeight: 44,
+        paddingVertical: 4,
+        paddingHorizontal: 12,
+        minHeight: 56,
     },
-    conversationItem: {
+    mainContent: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
-        paddingVertical: 8,
-        paddingLeft: 4,
+        gap: 12,
         paddingRight: 8,
-        minHeight: 44,
     },
-    convIconWrap: {
-        width: 28,
-        height: 28,
-        borderRadius: 6,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    convContent: {
+    textContainer: {
         flex: 1,
-        justifyContent: 'center',
-        minWidth: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
     },
     convTitle: {
         fontSize: 15,
         fontWeight: '500',
-        marginBottom: 2,
+        flexShrink: 1,
     },
     convTime: {
         fontSize: 12,
         fontWeight: '400',
+        flexShrink: 0,
     },
     deleteBtn: {
         width: 36,
         height: 36,
-        borderRadius: 8,
+        borderRadius: 18,
         justifyContent: 'center',
         alignItems: 'center',
     },

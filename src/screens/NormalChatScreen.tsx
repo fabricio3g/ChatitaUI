@@ -84,7 +84,7 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
     const [activeInAppUrl, setActiveInAppUrl] = useState<string | null>(null);
     const [userName, setUserName] = useState<string>('');
     const [sidebarVisible, setSidebarVisible] = useState(false);
-    const [currentModel, setCurrentModel] = useState('gpt-3.5-turbo');
+    const [currentModel, setCurrentModel] = useState('Select a provider and model in settings');
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [editingMessage, setEditingMessage] = useState<Message | null>(null);
     const [toolActivity, setToolActivity] = useState<ToolActivityEvent[]>([]);
@@ -161,7 +161,7 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
         };
         checkOnline();
 
-        
+
         const detectDeviceTier = () => {
             setDeviceTier('medium');
         };
@@ -245,7 +245,7 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
                 refreshProviderAndModel();
             }
         });
-        return unsubscribe;
+        return () => { unsubscribe(); };
     }, []);
 
     const refreshProviderAndModel = useCallback(async () => {
@@ -334,7 +334,9 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
 
     const loadMessages = async (convId: string) => {
         const msgs = await DatabaseService.getMessages(convId);
-        setLocalMessages(msgs);
+        // Ensure messages are sorted by timestamp (ascending = oldest first)
+        const sorted = [...msgs].sort((a, b) => a.timestamp - b.timestamp);
+        setLocalMessages(sorted);
     };
 
     const handleEdit = (msg: Message) => {
@@ -465,15 +467,23 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
             };
         });
 
-        // Remove the old assistant message and any messages after it
-        const messagesToRemove = localMessages.slice(msgIndex);
-        for (const msg of messagesToRemove) {
-            await DatabaseService.deleteMessage(msg.id);
-        }
-
-        setLocalMessages(history);
+        // Remove only the old assistant message (keep later messages intact)
+        await DatabaseService.deleteMessage(oldAssistantMsg.id);
+        const nextMessages = [
+            ...localMessages.slice(0, msgIndex),
+            ...localMessages.slice(msgIndex + 1)
+        ];
+        setLocalMessages(nextMessages);
         clearToolActivity();
-        await processConversationStep(history, userMsg.id); // Pass userMsg.id to track versions
+        // Pass only messages up to user prompt for LLM context,
+        // but insertIndex ensures response goes back in correct position
+        // Using nextMessages as base preserves messages after the regenerated one
+        await processConversationStep(
+            nextMessages.slice(0, userMsgIndex + 1), // Only messages up to user for LLM
+            userMsg.id,
+            undefined,
+            msgIndex // Insert at the original position
+        );
     };
 
     const handleVersionChange = (parentId: string, versionIndex: number) => {
@@ -587,7 +597,8 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
     const processConversationStep = async (
         initialMessages: Message[],
         parentUserMsgId?: string,
-        toolPrefs?: { useDeepSearch?: boolean; useWebSearch?: boolean; useImageGen?: boolean }
+        toolPrefs?: { useDeepSearch?: boolean; useWebSearch?: boolean; useImageGen?: boolean },
+        insertIndex?: number
     ) => {
         autoScrollRef.current = true;
         userScrollingRef.current = false;
@@ -720,7 +731,7 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
                                 } else {
                                     // First batch: add message to state with initial content
                                     addedToMessagesRef.current = true;
-                                    return [...prev, {
+                                    const newMsg = {
                                         ...assistantMsg,
                                         content: batch.content,
                                         metadata: {
@@ -729,7 +740,15 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
                                             thinking: fullThinking,
                                             tokenUsage: lastTokenUsage
                                         }
-                                    }];
+                                    };
+                                    const next = [...prev];
+                                    if (typeof insertIndex === 'number') {
+                                        const safeIndex = Math.min(Math.max(insertIndex, 0), next.length);
+                                        next.splice(safeIndex, 0, newMsg);
+                                    } else {
+                                        next.push(newMsg);
+                                    }
+                                    return next;
                                 }
                             });
 
@@ -882,7 +901,7 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
                             setLocalMessages((prev) => {
                                 if (!addedToMessagesRef.current) {
                                     addedToMessagesRef.current = true;
-                                    return [...prev, {
+                                    const newMsg = {
                                         ...assistantMsg,
                                         content: '',
                                         metadata: {
@@ -890,7 +909,15 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
                                             thinking: fullThinking,
                                             isStreaming: true
                                         }
-                                    }];
+                                    };
+                                    const next = [...prev];
+                                    if (typeof insertIndex === 'number') {
+                                        const safeIndex = Math.min(Math.max(insertIndex, 0), next.length);
+                                        next.splice(safeIndex, 0, newMsg);
+                                    } else {
+                                        next.push(newMsg);
+                                    }
+                                    return next;
                                 }
 
                                 return prev.map((m) => {
@@ -976,7 +1003,7 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
                 const finalAssistantMsg: Message = {
                     ...assistantMsg,
                     content: fullContent,
-                    timestamp: Date.now(),
+                    // Keep original timestamp from assistantMsg to maintain correct order
                     tool_calls: accumulatedToolCalls.length > 0 ? accumulatedToolCalls : undefined,
                     metadata: { isStreaming: false, thinking: fullThinking, tokenUsage: lastTokenUsage, groupedToolResponses, fadeIn: !streamingChunksEnabled }
                 };
@@ -1071,12 +1098,12 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
 
                         try {
                             const toolArgs = safeJSONParse(toolCall.function.arguments, {});
-                        const result = await ToolRegistry.executeTool(
-                            toolName,
-                            toolArgs,
-                            {
-                                conversationId: localConversationId,
-                                onProgress: (status, _currentStep, _totalSteps, meta) => {
+                            const result = await ToolRegistry.executeTool(
+                                toolName,
+                                toolArgs,
+                                {
+                                    conversationId: localConversationId,
+                                    onProgress: (status, _currentStep, _totalSteps, meta) => {
                                         if (suppressIntermediateToolActivity) return;
                                         const message = meta?.domain
                                             ? `${status} (${meta.domain})`
@@ -1088,23 +1115,23 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
 
                             if (!streamingRef.current) break;
 
-                        const isToolResponse = result && typeof result === 'object' && 'type' in result && 'content' in result;
-                        const toolContent = isToolResponse ? result.content : (typeof result === 'string' ? result : JSON.stringify(result));
-                        console.log(`[NormalChatScreen] Tool ${toolName} completed, result length:`, toolContent?.length || 0);
-                        pushToolActivity(
-                            suppressIntermediateToolActivity
-                                ? 'Web browse completed'
-                                : `${toolName.replace(/_/g, ' ')} completed`,
-                            toolName.includes('search') ? 'web' : 'tool',
-                            'done'
-                        );
-                        if (isToolResponse) {
-                            pendingToolResponses.push(result);
-                        }
+                            const isToolResponse = result && typeof result === 'object' && 'type' in result && 'content' in result;
+                            const toolContent = isToolResponse ? result.content : (typeof result === 'string' ? result : JSON.stringify(result));
+                            console.log(`[NormalChatScreen] Tool ${toolName} completed, result length:`, toolContent?.length || 0);
+                            pushToolActivity(
+                                suppressIntermediateToolActivity
+                                    ? 'Web browse completed'
+                                    : `${toolName.replace(/_/g, ' ')} completed`,
+                                toolName.includes('search') ? 'web' : 'tool',
+                                'done'
+                            );
+                            if (isToolResponse) {
+                                pendingToolResponses.push(result);
+                            }
 
-                        currentMessages.push({
-                            role: 'tool',
-                            content: toolContent,
+                            currentMessages.push({
+                                role: 'tool',
+                                content: toolContent,
                                 tool_call_id: toolCall.id || `tool_${Date.now()}`,
                             });
                         } catch (e: any) {
@@ -1371,8 +1398,8 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
             // Mensaje específico según el error
             let errorMessage = 'Failed to start recording.';
             if (e.message?.includes('System Voice is not available')) {
-                errorMessage = 'System speech unavailable. Try Expo Speech, Whisper Local, or API in Settings > Speech to Text.';
-            } else if (e.message?.includes('expo-speech-recognition') || e.message?.includes('not available')) {
+                errorMessage = 'System speech unavailable. Try Whisper Local or API in Settings > Speech to Text.';
+            } else if (e.message?.includes('not available')) {
                 errorMessage = 'Speech recognition module not available. Try Whisper Local or API in Settings > Speech to Text.';
             } else if (e.message?.includes('permission')) {
                 errorMessage = 'Microphone permission denied. Please enable it in settings.';
@@ -1589,7 +1616,7 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
 
                 <KeyboardAvoidingView
                     style={styles.keyboardContainer}
-                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
                 >
                     {displayMessages.length === 0 ? (
@@ -1637,107 +1664,107 @@ export const NormalChatScreen: React.FC = ({ navigation }: any) => {
                     <View
                         style={[
                             styles.inputDock,
-                            { paddingBottom: Math.max(insets.bottom, 8) + (Platform.OS === 'android' ? keyboardHeight : 0) }
+                            { paddingBottom: Math.max(insets.bottom, 8) }
                         ]}
                     >
                         {/* Floating Input Container */}
                         <View style={styles.floatingInputContainer}>
-                                {/* Active Tool Badge */}
-                                {(activeTool || thinkMode) && (
-                                    <View style={[styles.activeToolBadge, { backgroundColor: theme.colors.primary + '20' }]}>
-                                        <Feather name={thinkMode ? "cpu" : "zap"} size={14} color={theme.colors.primary} />
-                                        <Text style={[styles.activeToolText, { color: theme.colors.primary }]}>
-                                            {activeTool || 'Thinking Mode'} Active
-                                        </Text>
-                                        <Pressable onPress={() => {
-                                            setActiveTool(null);
-                                            setThinkMode(false);
-                                        }}>
-                                            <Feather name="x" size={14} color={theme.colors.primary} />
-                                        </Pressable>
-                                    </View>
-                                )}
+                            {/* Active Tool Badge */}
+                            {(activeTool || thinkMode) && (
+                                <View style={[styles.activeToolBadge, { backgroundColor: theme.colors.primary + '20' }]}>
+                                    <Feather name={thinkMode ? "cpu" : "zap"} size={14} color={theme.colors.primary} />
+                                    <Text style={[styles.activeToolText, { color: theme.colors.primary }]}>
+                                        {activeTool || 'Thinking Mode'} Active
+                                    </Text>
+                                    <Pressable onPress={() => {
+                                        setActiveTool(null);
+                                        setThinkMode(false);
+                                    }}>
+                                        <Feather name="x" size={14} color={theme.colors.primary} />
+                                    </Pressable>
+                                </View>
+                            )}
 
-                                {/* Attachment Preview */}
-                                <AttachmentPreview
-                                    attachments={attachments}
-                                    onRemove={handleRemoveAttachment}
-                                />
+                            {/* Attachment Preview */}
+                            <AttachmentPreview
+                                attachments={attachments}
+                                onRemove={handleRemoveAttachment}
+                            />
 
-                        {/* Vision Mode Indicator */}
-                                {attachments.some(a => a.type === 'image') && visionMode && (
-                                    <View style={[styles.visionBadge, { backgroundColor: theme.colors.success + '20' }]}>
-                                        <Feather name="eye" size={14} color={theme.colors.success} />
-                                        <Text style={[styles.visionBadgeText, { color: theme.colors.success }]}>
-                                            Vision Mode - Describe image or extract text from photo
-                                        </Text>
-                                    </View>
-                                )}
+                            {/* Vision Mode Indicator */}
+                            {attachments.some(a => a.type === 'image') && visionMode && (
+                                <View style={[styles.visionBadge, { backgroundColor: theme.colors.success + '20' }]}>
+                                    <Feather name="eye" size={14} color={theme.colors.success} />
+                                    <Text style={[styles.visionBadgeText, { color: theme.colors.success }]}>
+                                        Vision Mode - Describe image or extract text from photo
+                                    </Text>
+                                </View>
+                            )}
 
-                        {/* Vision Mode Warning */}
-                                {attachments.some(a => a.type === 'image') && !visionMode && (
-                                    <View style={[styles.visionBadge, { backgroundColor: theme.colors.warning + '20' }]}>
-                                        <Feather name="alert-circle" size={14} color={theme.colors.warning} />
-                                        <Text style={[styles.visionBadgeText, { color: theme.colors.warning }]}>
-                                            Current model doesn't support images
-                                        </Text>
-                                    </View>
-                                )}
+                            {/* Vision Mode Warning */}
+                            {attachments.some(a => a.type === 'image') && !visionMode && (
+                                <View style={[styles.visionBadge, { backgroundColor: theme.colors.warning + '20' }]}>
+                                    <Feather name="alert-circle" size={14} color={theme.colors.warning} />
+                                    <Text style={[styles.visionBadgeText, { color: theme.colors.warning }]}>
+                                        Current model doesn't support images
+                                    </Text>
+                                </View>
+                            )}
 
-                                <ChatInput
-                                    value={inputText}
-                                    onChangeText={setInputText}
-                                    onSend={() => sendMessage(inputText)}
-                                    onCancel={() => {
-                                        streamingRef.current = false;
-                                        setIsStreaming(false);
-                                        pushToolActivity('Cancelled by user', 'tool', 'error');
+                            <ChatInput
+                                value={inputText}
+                                onChangeText={setInputText}
+                                onSend={() => sendMessage(inputText)}
+                                onCancel={() => {
+                                    streamingRef.current = false;
+                                    setIsStreaming(false);
+                                    pushToolActivity('Cancelled by user', 'tool', 'error');
+                                }}
+                                disabled={isStreaming}
+                                isStreaming={isStreaming}
+                                onMenuPress={toolsEnabled ? () => {
+                                    Keyboard.dismiss();
+                                    setMenuVisible(true);
+                                } : undefined}
+                                onDictationStart={handleDictationStart}
+                                onDictationEnd={handleDictationEnd}
+                                isDictating={isDictating}
+                            />
+
+                            <DictationOverlay
+                                visible={isDictating}
+                                level={dictationLevel}
+                                provider={dictationProvider || undefined}
+                                elapsedMs={dictationElapsedMs}
+                            />
+
+                            {/* Active Mini-Apps */}
+                            {activeMiniApp === 'quiz' && (
+                                <QuizMiniApp
+                                    visible={true}
+                                    onClose={() => setActiveMiniApp(null)}
+                                    onShareToChat={(result) => {
+                                        // Add result to chat
+                                        const userMsg: Message = {
+                                            id: uuidv4(),
+                                            conversationId: localConversationId,
+                                            role: 'user',
+                                            content: result.content,
+                                            timestamp: Date.now(),
+                                        };
+                                        setLocalMessages(prev => [...prev, userMsg]);
+                                        DatabaseService.addMessage(userMsg);
+                                        setActiveMiniApp(null);
                                     }}
-                                    disabled={isStreaming}
-                                    isStreaming={isStreaming}
-                                    onMenuPress={toolsEnabled ? () => {
-                                        Keyboard.dismiss();
-                                        setMenuVisible(true);
-                                    } : undefined}
-                                    onDictationStart={handleDictationStart}
-                                    onDictationEnd={handleDictationEnd}
-                                    isDictating={isDictating}
+                                    deviceTier={deviceTier}
+                                    preferredMode={'auto' as MiniAppMode}
+                                    isOnline={isOnline}
+                                    conversationId={localConversationId}
+                                    messages={localMessages}
                                 />
+                            )}
 
-                                <DictationOverlay
-                                    visible={isDictating}
-                                    level={dictationLevel}
-                                    provider={dictationProvider || undefined}
-                                    elapsedMs={dictationElapsedMs}
-                                />
 
-                        {/* Active Mini-Apps */}
-                                {activeMiniApp === 'quiz' && (
-                                    <QuizMiniApp
-                                        visible={true}
-                                        onClose={() => setActiveMiniApp(null)}
-                                        onShareToChat={(result) => {
-                                            // Add result to chat
-                                            const userMsg: Message = {
-                                                id: uuidv4(),
-                                                conversationId: localConversationId,
-                                                role: 'user',
-                                                content: result.content,
-                                                timestamp: Date.now(),
-                                            };
-                                            setLocalMessages(prev => [...prev, userMsg]);
-                                            DatabaseService.addMessage(userMsg);
-                                            setActiveMiniApp(null);
-                                        }}
-                                        deviceTier={deviceTier}
-                                        preferredMode={'auto' as MiniAppMode}
-                                        isOnline={isOnline}
-                                        conversationId={localConversationId}
-                                        messages={localMessages}
-                                    />
-                                )}
-
-                               
                         </View>
                     </View>
                 </KeyboardAvoidingView>
@@ -1896,19 +1923,19 @@ const MemoizedMessageList: React.FC<MessageListProps> = memo(({
             renderItem={renderItem}
             contentContainerStyle={styles.messageList}
             showsVerticalScrollIndicator={false}
-            initialNumToRender={10}           
-            maxToRenderPerBatch={5}            
-            windowSize={5}                     
-            removeClippedSubviews={true}        
+            initialNumToRender={10}
+            maxToRenderPerBatch={5}
+            windowSize={5}
+            removeClippedSubviews={true}
             onScroll={onScroll}
             onScrollBeginDrag={onScrollBeginDrag}
             onScrollEndDrag={onScrollEndDrag}
             onContentSizeChange={onContentSizeChange}
             scrollEventThrottle={16}
-      
-            updateCellsBatchingPeriod={50}      
-            legacyImplementation={false}        
-            onEndReachedThreshold={0.5}         
+
+            updateCellsBatchingPeriod={50}
+            legacyImplementation={false}
+            onEndReachedThreshold={0.5}
         />
     );
 });
@@ -1917,6 +1944,8 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     welcomeWrapper: {
         flex: 1,
+        flexGrow: 1,
+        flexShrink: 0,
         justifyContent: 'center',
     },
     header: {

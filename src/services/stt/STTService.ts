@@ -1,11 +1,10 @@
 import { Audio } from 'expo-av';
 import { SystemSTTProvider } from './SystemSTTProvider';
-import { ExpoSpeechProvider } from './ExpoSpeechProvider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LOCAL_INFERENCE_ENABLED } from '../../config/localInference';
 import { decodeAudioFile } from '../../utils/audioDecoder';
 
-export type STTProviderType = 'api' | 'whisper_local' | 'system' | 'expo_speech';
+export type STTProviderType = 'api' | 'whisper_local' | 'system';
 
 export interface STTConfig {
     provider: STTProviderType;
@@ -36,7 +35,7 @@ class STTServiceClass {
     private recording: Audio.Recording | null = null;
     private isStartingRecording = false;
     private config: STTConfig = {
-        provider: 'expo_speech', // Default: works in Expo Go; fallback to system
+        provider: 'system', // Default: system speech recognition
         baseUrl: 'https://api.openai.com/v1',
         model: 'whisper-1',
     };
@@ -78,19 +77,17 @@ class STTServiceClass {
                 let provider = savedProvider[1] as STTProviderType;
                 // If local inference is disabled and whisper_local was selected, fallback
                 if (provider === 'whisper_local' && !LOCAL_INFERENCE_ENABLED.STT) {
-                    // Prefer expo_speech over system as fallback
-                    const expoAvail = await ExpoSpeechProvider.isAvailable();
-                    provider = expoAvail ? 'expo_speech' : 'system';
+                    provider = 'system';
                     console.log('[STTService] Whisper local unavailable, falling back to:', provider);
+                }
+                // Handle legacy expo_speech setting
+                if ((provider as string) === 'expo_speech') {
+                    provider = 'system';
                 }
                 this.config.provider = provider;
             } else {
-                // Auto-detect best provider: expo_speech works in Expo Go
-                const expoAvail = await ExpoSpeechProvider.isAvailable();
-                if (expoAvail) {
-                    this.config.provider = 'expo_speech';
-                    console.log('[STTService] Auto-selected expo_speech as default');
-                } else if (LOCAL_INFERENCE_ENABLED.STT) {
+                // Auto-detect best provider
+                if (LOCAL_INFERENCE_ENABLED.STT) {
                     // Only check for Whisper local if local inference is enabled
                     const whisper = await getWhisperSTT();
                     if (whisper) {
@@ -124,28 +121,19 @@ class STTServiceClass {
 
             // If provider is whisper_local, check if models are actually available AND local inference is enabled
             if (this.config.provider === 'whisper_local') {
-                // Helper to get best fallback provider
-                const getFallback = async (): Promise<STTProviderType> => {
-                    const expoAvail = await ExpoSpeechProvider.isAvailable();
-                    return expoAvail ? 'expo_speech' : 'system';
-                };
-
                 if (!LOCAL_INFERENCE_ENABLED.STT) {
-                    const fallback = await getFallback();
-                    console.log('[STTService] Whisper local selected but local inference disabled, falling back to:', fallback);
-                    this.config.provider = fallback;
+                    console.log('[STTService] Whisper local selected but local inference disabled, falling back to system');
+                    this.config.provider = 'system';
                 } else {
                     const whisper = await getWhisperSTT();
                     if (!whisper) {
-                        const fallback = await getFallback();
-                        console.log('[STTService] Whisper not available, falling back to:', fallback);
-                        this.config.provider = fallback;
+                        console.log('[STTService] Whisper not available, falling back to system');
+                        this.config.provider = 'system';
                     } else {
                         const whisperModels = await whisper.getDownloadedModels();
                         if (whisperModels.length === 0) {
-                            const fallback = await getFallback();
-                            console.log('[STTService] Whisper local selected but no models found, falling back to:', fallback);
-                            this.config.provider = fallback;
+                            console.log('[STTService] Whisper local selected but no models found, falling back to system');
+                            this.config.provider = 'system';
                         } else {
                             const preferredModel = await this.getPreferredWhisperModel(whisperModels);
                             if (preferredModel) {
@@ -212,13 +200,9 @@ class STTServiceClass {
             await this.initialize();
         }
 
-        // System & Expo Speech use their own streaming logic (no expo-av Recording)
+        // System uses its own streaming logic (no expo-av Recording)
         if (this.config.provider === 'system') {
             await SystemSTTProvider.start();
-            return;
-        }
-        if (this.config.provider === 'expo_speech') {
-            await ExpoSpeechProvider.start();
             return;
         }
 
@@ -271,10 +255,7 @@ class STTServiceClass {
             const result = await SystemSTTProvider.stop();
             return result ? `system://${encodeURIComponent(result)}` : null;
         }
-        if (this.config.provider === 'expo_speech') {
-            const result = await ExpoSpeechProvider.stop();
-            return result ? `system://${encodeURIComponent(result)}` : null;
-        }
+
 
         if (!this.recording) return null;
 
@@ -424,15 +405,7 @@ class STTServiceClass {
         if (currentProvider === 'system') {
             const moduleLinked = SystemSTTProvider.isModuleLinked();
             if (!moduleLinked) {
-                const expoLinked = ExpoSpeechProvider.isModuleLinked();
-                if (expoLinked) {
-                    return {
-                        available: false,
-                        provider: 'system',
-                        fallback: 'expo_speech',
-                        message: 'System speech module not linked. Switching to Expo Speech.'
-                    };
-                }
+
                 if (LOCAL_INFERENCE_ENABLED.STT) {
                     const whisper = await getWhisperSTT();
                     if (whisper) {
@@ -456,33 +429,7 @@ class STTServiceClass {
             }
         }
 
-        if (currentProvider === 'expo_speech') {
-            const expoLinked = ExpoSpeechProvider.isModuleLinked();
-            if (!expoLinked) {
-                // Expo Speech not available - try whisper_local first, then api
-                if (LOCAL_INFERENCE_ENABLED.STT) {
-                    const whisper = await getWhisperSTT();
-                    if (whisper) {
-                        const whisperModels = await whisper.getDownloadedModels();
-                        if (whisperModels.length > 0) {
-                            return {
-                                available: false,
-                                provider: 'expo_speech',
-                                fallback: 'whisper_local',
-                                message: 'Expo Speech module not linked. Using local Whisper instead.'
-                            };
-                        }
-                    }
-                }
-                // Fallback to API if whisper not available
-                return {
-                    available: false,
-                    provider: 'expo_speech',
-                    fallback: 'api',
-                    message: 'Speech recognition module not linked. Using API transcription instead. Configure API key in Settings > Speech to Text.'
-                };
-            }
-        }
+
 
         if (currentProvider === 'whisper_local') {
             if (!LOCAL_INFERENCE_ENABLED.STT) {
